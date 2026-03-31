@@ -121,10 +121,12 @@ make run
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| Bootloader (GRUB) | ✅ Setup | GRUB config, Multiboot2 header |
-| Kernel entry | 🔄 In progress | Boot assembly, `ck_kernel.c` |
-| VGA driver | ⏳ Planned | Text-mode display (80×25) |
-| Interrupt handling | ⏳ Planned | IDT, ISR, PIC remapping |
+| Bootloader (GRUB) | ✅ Complete | GRUB config, Multiboot2 header, auto-boot |
+| Kernel entry | ✅ Complete | Boot assembly, `ck_kernel.c`, linker script |
+| Build pipeline | ✅ Complete | Makefile: NASM → GCC → LD → ISO |
+| VGA text driver | ✅ Complete | Clear screen, write strings (80×25) |
+| Kernel boots in QEMU | ✅ Complete | Boots and displays message successfully |
+| Interrupt handling | 🔄 Next | IDT, ISR stubs, PIC remapping |
 | Keyboard driver | ⏳ Planned | PS/2 keyboard via IRQ1 |
 | Physical memory manager | ⏳ Planned | Bitmap frame allocator |
 | Heap allocator | ⏳ Planned | `ck_malloc` / `ck_free` |
