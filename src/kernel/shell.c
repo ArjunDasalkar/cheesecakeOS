@@ -401,21 +401,21 @@ void ck_shell_run(void) {
     ck_cursor_pos = 2 * VGA_WIDTH;
     
     ck_vga_write_string("\n", COLOR_GREEN);
-    ck_vga_write_string("  ╔════════════════════════════════════════════╗\n", COLOR_GREEN);
-    ck_vga_write_string("  ║  CheesecakeOS - Multitasking Kernel v1.0   ║\n", COLOR_GREEN);
-    ck_vga_write_string("  ║     Ready to serve! (May 2026)             ║\n", COLOR_GREEN);
-    ck_vga_write_string("  ╚════════════════════════════════════════════╝\n", COLOR_GREEN);
+    ck_vga_write_string("  +====================================+\n", COLOR_GREEN);
+    ck_vga_write_string("  | CheesecakeOS - Multitasking v1.0 |\n", COLOR_GREEN);
+    ck_vga_write_string("  |    Ready to serve! (May 2026)    |\n", COLOR_GREEN);
+    ck_vga_write_string("  +====================================+\n", COLOR_GREEN);
     ck_vga_write_string("\n", COLOR_WHITE);
     ck_vga_write_string("Type 'help' for commands | Try 'taskmon' for live demo\n", COLOR_YELLOW);
     ck_vga_write_string("\n", COLOR_WHITE);
     ck_vga_write_string("> ", COLOR_YELLOW);
     
     while (1) {
+        /* Run kernel tasks cooperatively FIRST (before status update) */
+        ck_scheduler_run_tasks();
+        
         /* Update status every iteration (shows time ticking) */
         ck_shell_draw_status();
-        
-        /* Run kernel tasks cooperatively (before checking for input) */
-        ck_scheduler_run_tasks();
         
         /* Check for keyboard input (non-blocking via buffer) */
         char c = ck_keyboard_read_char();
