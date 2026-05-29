@@ -27,13 +27,21 @@ static inline uint8_t ck_inb(uint16_t port) {
     return value;
 }
 
+/* Forward declaration for scheduler */
+extern struct ck_registers *ck_schedule(struct ck_registers *current_regs);
+
 /*
  * Timer interrupt handler.
  * Called by IRQ 0 every 1 ms (if configured for 1 kHz).
+ * 
+ * Called from assembly context where all registers are already saved.
+ * This handler performs context switching for multitasking.
  */
 static void ck_timer_irq_handler(uint8_t irq) {
     (void)irq;  /* Unused */
     ck_timer_ticks++;
+    
+    /* Scheduler will be invoked from assembly for true context switching */
 }
 
 /*

@@ -40,6 +40,8 @@ TIMER_C := $(DRIVERS_DIR)/timer.c
 KEYBOARD_C := $(DRIVERS_DIR)/keyboard.c
 SCANCODE_C := $(DRIVERS_DIR)/scancode.c
 SHELL_C := $(SRC_DIR)/kernel/shell.c
+SCHEDULER_C := $(SRC_DIR)/kernel/scheduler.c
+KERNEL_TASKS_C := $(SRC_DIR)/kernel/kernel_tasks.c
 PMEM_C := $(MEMORY_DIR)/pmem.c
 PAGING_C := $(MEMORY_DIR)/paging.c
 HEAP_C := $(MEMORY_DIR)/heap.c
@@ -59,6 +61,8 @@ TIMER_OBJ := $(BUILD_DIR)/timer.o
 KEYBOARD_OBJ := $(BUILD_DIR)/keyboard.o
 SCANCODE_OBJ := $(BUILD_DIR)/scancode.o
 SHELL_OBJ := $(BUILD_DIR)/shell.o
+SCHEDULER_OBJ := $(BUILD_DIR)/scheduler.o
+KERNEL_TASKS_OBJ := $(BUILD_DIR)/kernel_tasks.o
 PMEM_OBJ := $(BUILD_DIR)/pmem.o
 PAGING_OBJ := $(BUILD_DIR)/paging.o
 HEAP_OBJ := $(BUILD_DIR)/heap.o
@@ -125,6 +129,14 @@ $(SCANCODE_OBJ): $(SCANCODE_C) | $(BUILD_DIR)
 $(SHELL_OBJ): $(SHELL_C) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -c -o $@
 
+# Compile scheduler
+$(SCHEDULER_OBJ): $(SCHEDULER_C) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -c -o $@
+
+# Compile kernel tasks
+$(KERNEL_TASKS_OBJ): $(KERNEL_TASKS_C) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -c -o $@
+
 # Compile physical memory allocator
 $(PMEM_OBJ): $(PMEM_C) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -c -o $@
@@ -138,8 +150,8 @@ $(HEAP_OBJ): $(HEAP_C) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $< -c -o $@
 
 # Link final kernel binary
-$(KERNEL_BIN): $(BOOT_OBJ) $(KERNEL_OBJ) $(INTERRUPTS_OBJ) $(ISR_OBJ) $(EXCEPTIONS_OBJ) $(EXCEPTIONS_ASM_OBJ) $(PIC_OBJ) $(IRQ_OBJ) $(IRQ_ASM_OBJ) $(TIMER_OBJ) $(KEYBOARD_OBJ) $(SCANCODE_OBJ) $(SHELL_OBJ) $(PMEM_OBJ) $(PAGING_OBJ) $(HEAP_OBJ) $(LINKER_SCRIPT)
-	$(LD) $(LDFLAGS) $(BOOT_OBJ) $(KERNEL_OBJ) $(INTERRUPTS_OBJ) $(ISR_OBJ) $(EXCEPTIONS_OBJ) $(EXCEPTIONS_ASM_OBJ) $(PIC_OBJ) $(IRQ_OBJ) $(IRQ_ASM_OBJ) $(TIMER_OBJ) $(KEYBOARD_OBJ) $(SCANCODE_OBJ) $(SHELL_OBJ) $(PMEM_OBJ) $(PAGING_OBJ) $(HEAP_OBJ) -o $@
+$(KERNEL_BIN): $(BOOT_OBJ) $(KERNEL_OBJ) $(INTERRUPTS_OBJ) $(ISR_OBJ) $(EXCEPTIONS_OBJ) $(EXCEPTIONS_ASM_OBJ) $(PIC_OBJ) $(IRQ_OBJ) $(IRQ_ASM_OBJ) $(TIMER_OBJ) $(KEYBOARD_OBJ) $(SCANCODE_OBJ) $(SHELL_OBJ) $(SCHEDULER_OBJ) $(KERNEL_TASKS_OBJ) $(PMEM_OBJ) $(PAGING_OBJ) $(HEAP_OBJ) $(LINKER_SCRIPT)
+	$(LD) $(LDFLAGS) $(BOOT_OBJ) $(KERNEL_OBJ) $(INTERRUPTS_OBJ) $(ISR_OBJ) $(EXCEPTIONS_OBJ) $(EXCEPTIONS_ASM_OBJ) $(PIC_OBJ) $(IRQ_OBJ) $(IRQ_ASM_OBJ) $(TIMER_OBJ) $(KEYBOARD_OBJ) $(SCANCODE_OBJ) $(SHELL_OBJ) $(SCHEDULER_OBJ) $(KERNEL_TASKS_OBJ) $(PMEM_OBJ) $(PAGING_OBJ) $(HEAP_OBJ) -o $@
 
 # Stage ISO tree exactly like GRUB expects:
 # /boot/cheesecake.bin and /boot/grub/grub.cfg

@@ -3,6 +3,8 @@
 #include "../drivers/timer.h"
 #include "../memory/pmem.h"
 #include "../memory/heap.h"
+#include "scheduler.h"
+#include "kernel_tasks.h"
 
 /* VGA text buffer */
 #define VGA_BUFFER ((unsigned short *)0xB8000)
@@ -163,6 +165,7 @@ static void ck_shell_execute(const char *cmd) {
         ck_vga_write_string("  time    - this kernel is on a ROLL (no time to waste)\n", COLOR_WHITE);
         ck_vga_write_string("  clear   - clean slate? Un-beet-able!\n", COLOR_WHITE);
         ck_vga_write_string("  memory  - see the cream filling (memory stats)\n", COLOR_WHITE);
+        ck_vga_write_string("  tasks   - check the kitchen crew (multitasking demo)\n", COLOR_WHITE);
         ck_vga_write_string("  reboot  - let's make a fresh bake\n", COLOR_WHITE);
     } else if (ck_strcmp(cmd, "time") == 0) {
         uint32_t ticks = ck_timer_get_ticks();
@@ -198,6 +201,26 @@ static void ck_shell_execute(const char *cmd) {
         ck_vga_write_string(" bytes | Freed: ", COLOR_WHITE);
         ck_vga_write_number(heap_freed, COLOR_WHITE);
         ck_vga_write_string(" bytes\n", COLOR_WHITE);
+    } else if (ck_strcmp(cmd, "tasks") == 0) {
+        ck_vga_write_string("Running Kernel Tasks - The Kitchen Crew:\n", COLOR_GREEN);
+        
+        uint32_t num_tasks = ck_scheduler_task_count();
+        ck_vga_write_string("Total tasks: ", COLOR_WHITE);
+        ck_vga_write_number(num_tasks, COLOR_WHITE);
+        ck_vga_write_string("\n\n", COLOR_WHITE);
+        
+        for (uint32_t i = 0; i < num_tasks; i++) {
+            struct ck_task *task = ck_scheduler_get_task(i);
+            if (task) {
+                ck_vga_write_string("Task #", COLOR_YELLOW);
+                ck_vga_write_number(i, COLOR_YELLOW);
+                ck_vga_write_string(": Counter = ", COLOR_WHITE);
+                ck_vga_write_number(ck_task_counter[i], COLOR_WHITE);
+                ck_vga_write_string(" (runs: ", COLOR_WHITE);
+                ck_vga_write_number(task->times_run, COLOR_WHITE);
+                ck_vga_write_string(")\n", COLOR_WHITE);
+            }
+        }
     } else if (ck_strcmp(cmd, "clear") == 0) {
         ck_vga_clear_screen();
         ck_cursor_pos = VGA_WIDTH;  /* Leave status line alone */
@@ -234,10 +257,13 @@ void ck_shell_run(void) {
         /* Update status every iteration (shows time ticking) */
         ck_shell_draw_status();
         
+        /* Run kernel tasks cooperatively (before checking for input) */
+        ck_scheduler_run_tasks();
+        
+        /* Check for keyboard input (non-blocking via buffer) */
         char c = ck_keyboard_read_char();
         if (c == 0) {
-            /* No key pressed, sleep briefly to avoid busy-wait */
-            __asm__("hlt");
+            /* No key pressed, continue to next loop iteration */
             continue;
         }
         

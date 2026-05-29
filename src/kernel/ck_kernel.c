@@ -10,6 +10,8 @@
 #include "../memory/paging.h"
 #include "../memory/heap.h"
 #include "shell.h"
+#include "scheduler.h"
+#include "kernel_tasks.h"
 
 /* VGA text buffer + screen size */
 #define VGA_BUFFER ((unsigned short *)0xB8000)
@@ -56,6 +58,14 @@ void ck_main(void) {
     ck_pmem_init(NULL);   /* TODO: Pass GRUB multiboot info */
     ck_paging_init();
     ck_heap_init();
+    
+    /* Initialize scheduler and create demo tasks */
+    ck_scheduler_init();
+    
+    struct ck_task task1, task2, task3;
+    ck_task_create(&task1, ck_task_demo_1, 4096);  /* 4KB stack per task */
+    ck_task_create(&task2, ck_task_demo_2, 4096);
+    ck_task_create(&task3, ck_task_demo_3, 4096);
 
     /* Enable interrupts */
     __asm__("sti");
