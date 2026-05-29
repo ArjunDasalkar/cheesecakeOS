@@ -1,6 +1,6 @@
 # Development Log
 
-## Phase 1: Bootable Kernel (March 31, 2026)
+## Phase 1: Bootable Kernel
 
 ### Overview
 Got CheesecakeOS to boot successfully in QEMU and display a message on screen. The entire pipeline works: GRUB loads our Multiboot2 kernel, jumps to assembly entry point, which calls C code that writes directly to VGA text memory.
@@ -171,7 +171,7 @@ Next: Interrupt handling (IDT, ISR, PIC remapping) → PS/2 keyboard driver.
 
 ---
 
-## Phase 2: Exception Handling (May 27, 2026)
+## Phase 2: Exception Handling
 
 ### Overview
 Implemented CPU exception handling for all 32 x86 exceptions (0-31). The kernel now catches divide-by-zero, page faults, general protection faults, and other CPU exceptions, logs them, and halts gracefully instead of hanging silently.
@@ -264,7 +264,7 @@ Uses the same VGA text buffer as the kernel for consistency.
 
 ---
 
-## Phase 2b: Hardware Interrupts & Drivers (May 27, 2026)
+## Phase 2b: Hardware Interrupts & Drivers
 
 ### Overview
 Implemented PIC remapping, IRQ handling infrastructure, and basic timer and keyboard drivers. The kernel now accepts hardware interrupts, counts time ticks, and buffers keyboard input.
@@ -356,7 +356,7 @@ Next: Add more features (echo command, file syscalls, etc.) or expand memory man
 
 ---
 
-## Phase 3: Keyboard Enhancement (May 27, 2026 - Part 2)
+## Phase 3: Keyboard Enhancement
 
 ### Features Added
 
@@ -386,7 +386,7 @@ Next: Add more features (echo command, file syscalls, etc.) or expand memory man
 
 ---
 
-## Phase 3a: Memory Management Foundation (May 27, 2026 - Part 3)
+## Phase 3a: Memory Management Foundation
 
 ### Components Implemented
 
@@ -447,7 +447,7 @@ Next: Add more features (echo command, file syscalls, etc.) or expand memory man
 
 ---
 
-## Phase 2d: Debugging & Shell Stabilization (May 27, 2026)
+## Phase 2d: Debugging & Shell Stabilization
 
 ### The Problem
 After building the complete interrupt system with shell and keyboard driver, the kernel would boot but immediately bounce back to GRUB. QEMU would show "Loading from CD/DVD" then return to the boot menu in ~1-2 seconds.
@@ -534,7 +534,7 @@ Next: More commands or memory management.
 
 ---
 
-## Phase 2c: Shell & User Interaction (May 27, 2026)
+## Phase 2c: Shell & User Interaction
 
 ### Overview
 Built a complete interactive shell with scancode-to-ASCII conversion, real-time timer display, and command execution. Users can now type commands on a live keyboard-responsive prompt.
@@ -656,7 +656,7 @@ Users can:
 
 ---
 
-## Phase 3b: Multitasking Support (May 29, 2026)
+## Phase 3b: Multitasking Support
 
 ### Overview
 Transformed CheesecakeOS from a single-threaded kernel into a **multitasking operating system** with cooperative round-robin task scheduling. The kernel can now create and run multiple kernel tasks concurrently, with each task running until it yields control to the next task.
@@ -892,7 +892,7 @@ All built from scratch in C and x86 assembly, with no operating system running u
 
 ---
 
-## Phase 4a: Interactive Scheduler Visualizer (May 29, 2026)
+## Phase 4a: Interactive Scheduler Visualizer
 
 ### Overview
 Added a live task monitor to visualize the multitasking scheduler in action. The `taskmon` shell command launches an interactive display showing all running kernel tasks, their activity levels, and scheduler statistics. This transforms the abstract concept of multitasking into a visible, interactive demonstration.
@@ -1114,7 +1114,7 @@ Phase 4a transforms CheesecakeOS from an invisible, statistical multitasking ker
 
 ---
 
-## Phase 4b: Shell Polish and System Commands (May 29, 2026)
+## Phase 4b: Shell Polish and System Commands
 
 ### Overview
 Enhanced the shell with professional commands and improved UX. Added 5 new commands (`uptime`, `echo`, `ps`, `info`, `history`), implemented command history tracking, improved boot banner, and better error messages. The shell now feels like a complete system rather than a minimal demo.
@@ -1213,7 +1213,7 @@ Command History:
 ```
 ╔════════════════════════════════════════════╗
 ║  CheesecakeOS - Multitasking Kernel v1.0   ║
-║     Ready to serve! (May 2026)             ║
+║     Ready to serve!             ║
 ╚════════════════════════════════════════════╝
 
 Type 'help' for commands | Try 'taskmon' for live demo
@@ -1328,3 +1328,81 @@ System uptime: 12.3 seconds
 
 ### Summary
 Phase 4b transforms the shell from a minimal demo into a professional system interface. The boot banner, helpful commands, and history tracking make CheesecakeOS feel like a real, complete operating system. This is critical for portfolio presentation: the difference between "here's a kernel" and "here's a professional operating system project."
+
+---
+
+## Phase 4c: Taskmon Debugging + Mini Game Integration
+
+### Key Wins
+- Fixed Unicode rendering, cursor sync, and timer freeze in one pass.
+- Task monitor now shows real per-interval CPU activity (not static bars).
+- Mini game makes multitasking visible and recruiter-friendly.
+- Exit flow restored to clean banner + prompt.
+
+### Overview
+This phase was a major polish-and-debug pass focused on making multitasking visible and impressive. The goal was to turn `taskmon` into a live, recruiter-friendly demo with clear CPU activity, moving visuals, and stable UX. This also involved fixing a cluster of display and timing bugs introduced by the UI polish.
+
+### Debugging Sprint: Display + Timer + Cursor
+
+**Bug 1: Unicode box-drawing artifacts**
+- **Symptom:** Boot banner rendered garbage characters.
+- **Root cause:** VGA text mode only supports ASCII 0-255; UTF-8 box-drawing is multi-byte.
+- **Fix:** Replaced all Unicode with ASCII box characters (`+`, `|`, `=`).
+
+**Bug 2: Cursor stuck at top-left**
+- **Symptom:** Shell input appeared at the wrong location; hardware cursor blinked at (0,0).
+- **Root cause:** `ck_cursor_pos` updated, but VGA hardware cursor never synced.
+- **Fix:** Added VGA cursor update routine and called it after all cursor moves.
+
+**Bug 3: Timer frozen**
+- **Symptom:** Status line stayed at 0.003s.
+- **Root cause:** `ck_scheduler_run_tasks()` never returned because demo tasks ran infinite loops.
+- **Fix:** Rewrote demo tasks to do a single step per scheduler pass and return.
+
+**Bug 4: Status line aggressive flicker**
+- **Symptom:** Status line visibly blinking each loop.
+- **Root cause:** Full redraw every frame.
+- **Fix:** Throttled updates to only when tick count changes.
+
+### Task Monitor Improvements
+
+**Issue: Bars were empty or maxed**
+- **Cause:** VGA font didn't render block characters + bars were normalized to max counter, which kept them full.
+- **Fix:** Switched bars to ASCII `#` and `.` and normalized by per-frame deltas.
+
+**Issue: Counters identical and bars static**
+- **Cause:** All tasks incremented at fixed, equal rates.
+- **Fix:** Added variable workload tied to game state and input.
+
+**Issue: Task monitor input unreliable**
+- **Cause:** Only one key read per loop and busy loop timing.
+- **Fix:** Drain keyboard buffer each loop and throttle rendering to 20 FPS.
+
+**Issue: Cursor stuck after exiting taskmon**
+- **Cause:** VGA cursor disabled during monitor with no restore.
+- **Fix:** Re-enable cursor on exit and restore the boot banner + prompt at line 2.
+
+### Mini Game Integration (Recruiter Demo)
+
+Added a simple "Kitchen Bounce" mini game inside `taskmon`:
+- **Task 0 (Physics):** ball movement + collisions
+- **Task 1 (Input):** paddle movement from A/D + soft auto-centering
+- **Task 2 (Render load):** variable workload from game state
+
+The right side of the monitor now renders a small playfield with a bouncing ball and paddle. The CPU bars show per-interval usage, which visibly reacts to game events and input. This makes multitasking *feel* real, not just theoretical.
+
+### Build Error Resolved
+
+**Issue:** `kernel_tasks.c` failed to compile with undefined `ck_game_state`.
+- **Fix:** Included `kernel_tasks.h` so the shared game struct and constants are visible.
+
+### Outcome
+- `taskmon` is now a live, dynamic demo that clearly communicates scheduling behavior.
+- CPU bars reflect real, changing activity.
+- The mini game makes the scheduler tangible and recruiter-friendly.
+- All cursor, timer, and display issues are resolved and stable.
+
+### Files Touched
+- `src/kernel/shell.c` (cursor + banner restore)
+- `src/kernel/kernel_tasks.c/h` (game state + task behavior)
+- `src/kernel/visualizer.c` (taskmon rendering, FPS throttle, input, CPU bars)

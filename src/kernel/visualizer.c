@@ -11,6 +11,7 @@
 #include "scheduler.h"
 #include "kernel_tasks.h"
 #include "../drivers/keyboard.h"
+#include "../drivers/timer.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -24,6 +25,38 @@
 #define VGA_COLOR_CYAN 0x0B
 #define VGA_COLOR_GREEN 0x0A
 #define VGA_COLOR_YELLOW 0x0E
+
+#define GAME_TOP 3
+#define GAME_LEFT 52
+
+static const char *ck_task_name(uint32_t id) {
+    switch (id) {
+        case 0: return "Physics";
+        case 1: return "Input";
+        case 2: return "Render";
+        default: return "Worker";
+    }
+}
+
+/* VGA cursor control */
+#define VGA_CURSOR_CMD 0x3D4
+#define VGA_CURSOR_DATA 0x3D5
+
+static inline void vga_outb(uint16_t port, uint8_t value) {
+    __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static void vga_cursor_disable(void) {
+    vga_outb(VGA_CURSOR_CMD, 0x0A);
+    vga_outb(VGA_CURSOR_DATA, 0x20);
+}
+
+static void vga_cursor_enable(void) {
+    vga_outb(VGA_CURSOR_CMD, 0x0A);
+    vga_outb(VGA_CURSOR_DATA, 0x0F);
+    vga_outb(VGA_CURSOR_CMD, 0x0B);
+    vga_outb(VGA_CURSOR_DATA, 0x0F);
+}
 
 /*
  * Write a character to VGA at (row, col).
@@ -83,8 +116,37 @@ static void vga_clear_row(uint16_t row, uint8_t color) {
     }
 }
 
+static void draw_game_frame(void) {
+    struct ck_game_state state;
+    ck_game_get_state(&state);
+
+    uint16_t top = GAME_TOP;
+    uint16_t left = GAME_LEFT;
+    uint16_t width = CK_GAME_WIDTH;
+    uint16_t height = CK_GAME_HEIGHT;
+
+    for (uint16_t r = 0; r < height + 2; r++) {
+        for (uint16_t c = 0; c < width + 2; c++) {
+            char ch = ' ';
+            if (r == 0 || r == height + 1) {
+                ch = (c == 0 || c == width + 1) ? '+' : '-';
+            } else if (c == 0 || c == width + 1) {
+                ch = '|';
+            }
+            vga_write_char(top + r, left + c, ch, VGA_COLOR_WHITE);
+        }
+    }
+
+    vga_write_char(top + 1 + state.ball_y, left + 1 + state.ball_x, 'o', VGA_COLOR_YELLOW);
+
+    uint16_t paddle_row = top + height;
+    for (int i = 0; i < CK_GAME_PADDLE_WIDTH; i++) {
+        vga_write_char(paddle_row, left + 1 + state.paddle_x + i, '=', VGA_COLOR_GREEN);
+    }
+}
+
 /*
- * Draw a progress bar: [████░░░░░░░░░░] for a given percentage.
+ * Draw a progress bar: [####........] for a given percentage.
  * Bar is 20 chars wide, printed at (row, col).
  */
 static void draw_progress_bar(uint16_t row, uint16_t col, uint32_t max_val, uint32_t current_val, uint8_t color) {
@@ -101,9 +163,9 @@ static void draw_progress_bar(uint16_t row, uint16_t col, uint32_t max_val, uint
     
     for (uint32_t i = 0; i < 20; i++) {
         if (i < filled) {
-            bar[1 + i] = 0xFE;  /* Full block character */
+            bar[1 + i] = '#';
         } else {
-            bar[1 + i] = 0xF0;  /* Light shade character */
+            bar[1 + i] = '.';
         }
     }
     bar[21] = ']';
@@ -124,6 +186,14 @@ void ck_visualizer_init(void) {
  * Displays task stats in a loop until user presses 'q'.
  */
 int ck_visualizer_run_monitor(void) {
+    static uint32_t prev_counters[8] = {0};
+    uint32_t last_draw = 0;
+    const uint32_t frame_ms = 50;
+    int exit_requested = 0;
+    ck_game_init();
+
+    vga_cursor_disable();
+
     /* Clear screen */
     for (uint16_t row = 0; row < VGA_HEIGHT; row++) {
         vga_clear_row(row, VGA_COLOR_WHITE);
@@ -131,25 +201,62 @@ int ck_visualizer_run_monitor(void) {
     
     /* Main display loop */
     while (1) {
+        /* Handle input (drain buffer) */
+        while (1) {
+            char c = ck_keyboard_read_char();
+            if (c == 0) {
+                break;
+            }
+            if (c == 'q' || c == 'Q') {
+                exit_requested = 1;
+            } else if (c == 'a' || c == 'A' || c == 'd' || c == 'D') {
+                ck_game_on_key(c);
+            }
+        }
+        if (exit_requested) {
+            break;
+        }
+
+        /* Throttle rendering to keep motion visible */
+        uint32_t now = ck_timer_get_ticks();
+        if ((now - last_draw) < frame_ms) {
+            for (volatile uint32_t i = 0; i < 20000; i++) {
+                asm("nop");
+            }
+            continue;
+        }
+        last_draw = now;
+
+        /* Advance tasks so counters change while monitoring */
+        ck_scheduler_run_tasks();
+
         /* Draw header */
         vga_clear_row(0, VGA_COLOR_CYAN);
         vga_write_string(0, 1, "CheesecakeOS Task Scheduler Monitor", VGA_COLOR_CYAN);
         
         vga_clear_row(1, VGA_COLOR_WHITE);
         vga_write_string(1, 1, "===============================================", VGA_COLOR_WHITE);
+
+        vga_clear_row(2, VGA_COLOR_WHITE);
+        vga_write_string(2, 1, "A/D move paddle | Q quit", VGA_COLOR_YELLOW);
+
+        draw_game_frame();
         
-        /* Find max task counter for normalization */
-        uint32_t max_counter = 1;
+        /* Find total delta for normalization */
+        uint32_t total_delta = 0;
+        uint32_t deltas[8] = {0};
         for (uint32_t i = 0; i < ck_scheduler_task_count(); i++) {
-            uint32_t cnt = ck_task_counter[i];
-            if (cnt > max_counter) {
-                max_counter = cnt;
-            }
+            deltas[i] = ck_task_counter[i] - prev_counters[i];
+            prev_counters[i] = ck_task_counter[i];
+            total_delta += deltas[i];
+        }
+        if (total_delta == 0) {
+            total_delta = 1;
         }
         
         /* Draw task rows */
         for (uint32_t i = 0; i < ck_scheduler_task_count(); i++) {
-            uint16_t row = 3 + i;
+            uint16_t row = 12 + i;
             if (row >= 20) break;  /* Leave room for footer */
             
             struct ck_task *task = ck_scheduler_get_task(i);
@@ -161,13 +268,17 @@ int ck_visualizer_run_monitor(void) {
             vga_write_string(row, 1, "Task ", VGA_COLOR_GREEN);
             vga_write_uint32(row, 6, i, VGA_COLOR_GREEN);
             vga_write_string(row, 8, " ", VGA_COLOR_WHITE);
+            vga_write_string(row, 9, ck_task_name(i), VGA_COLOR_CYAN);
             
             /* Progress bar */
-            draw_progress_bar(row, 9, max_counter, ck_task_counter[i], VGA_COLOR_YELLOW);
+            draw_progress_bar(row, 22, total_delta, deltas[i], VGA_COLOR_YELLOW);
             
             /* Counter value */
-            vga_write_string(row, 31, "Counter: ", VGA_COLOR_WHITE);
-            vga_write_uint32(row, 40, ck_task_counter[i], VGA_COLOR_YELLOW);
+            vga_write_string(row, 44, "CPU: ", VGA_COLOR_WHITE);
+            uint32_t pct = (deltas[i] * 100) / total_delta;
+            vga_write_uint32(row, 49, pct, VGA_COLOR_YELLOW);
+            vga_write_string(row, 52, "% Cnt: ", VGA_COLOR_WHITE);
+            vga_write_uint32(row, 59, ck_task_counter[i], VGA_COLOR_YELLOW);
         }
         
         /* Summary stats line */
@@ -188,17 +299,13 @@ int ck_visualizer_run_monitor(void) {
         vga_clear_row(footer, VGA_COLOR_WHITE);
         vga_write_string(footer, 1, "[q] Quit monitor", VGA_COLOR_YELLOW);
         
-        /* Check for input */
-        char c = ck_keyboard_read_char();
-        if (c == 'q' || c == 'Q') {
-            break;
-        }
-        
         /* Small delay to avoid busy loop */
-        for (volatile uint32_t i = 0; i < 1000000; i++) {
+        for (volatile uint32_t i = 0; i < 100000; i++) {
             asm("nop");
         }
     }
+
+    vga_cursor_enable();
     
     return 0;
 }

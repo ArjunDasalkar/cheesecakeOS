@@ -12,6 +12,10 @@
 #define VGA_WIDTH 80
 #define VGA_HEIGHT 25
 
+/* VGA hardware cursor ports */
+#define VGA_CURSOR_CMD 0x3D4
+#define VGA_CURSOR_DATA 0x3D5
+
 /* Colors */
 #define COLOR_WHITE     0x0F
 #define COLOR_GREEN     0x0A
@@ -98,6 +102,18 @@ static void ck_history_add(const char *cmd) {
  */
 static uint16_t ck_cursor_pos = 0;  /* Current cursor position (0-2000) */
 
+static inline void ck_outb(uint16_t port, uint8_t value) {
+    __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static void ck_vga_update_hw_cursor(void) {
+    uint16_t pos = ck_cursor_pos;
+    ck_outb(VGA_CURSOR_CMD, 0x0F);
+    ck_outb(VGA_CURSOR_DATA, (uint8_t)(pos & 0xFF));
+    ck_outb(VGA_CURSOR_CMD, 0x0E);
+    ck_outb(VGA_CURSOR_DATA, (uint8_t)((pos >> 8) & 0xFF));
+}
+
 static void ck_vga_clear_line(int line) {
     int start = line * VGA_WIDTH;
     int end = start + VGA_WIDTH;
@@ -118,6 +134,7 @@ static void ck_vga_write_char(char c, uint8_t color) {
     
     VGA_BUFFER[ck_cursor_pos] = (color << 8) | (unsigned char)c;
     ck_cursor_pos++;
+    ck_vga_update_hw_cursor();
 }
 
 static void ck_vga_write_string(const char *s, uint8_t color) {
@@ -126,6 +143,7 @@ static void ck_vga_write_string(const char *s, uint8_t color) {
             /* Move to next line */
             int line = ck_cursor_pos / VGA_WIDTH;
             ck_cursor_pos = (line + 1) * VGA_WIDTH;
+            ck_vga_update_hw_cursor();
         } else {
             ck_vga_write_char(*s, color);
         }
@@ -136,6 +154,7 @@ static void ck_vga_write_string(const char *s, uint8_t color) {
 static void ck_vga_newline(void) {
     int line = ck_cursor_pos / VGA_WIDTH;
     ck_cursor_pos = (line + 1) * VGA_WIDTH;
+    ck_vga_update_hw_cursor();
 }
 
 static void ck_vga_write_number(uint32_t num, uint8_t color) {
@@ -163,15 +182,22 @@ static void ck_vga_clear_screen(void) {
         VGA_BUFFER[i] = (COLOR_WHITE << 8) | 0x20;
     }
     ck_cursor_pos = 0;
+    ck_vga_update_hw_cursor();
 }
 
 /*
  * Display status line at the top.
  */
 static void ck_shell_draw_status(void) {
+    static uint32_t last_ticks = 0;
     uint32_t ticks = ck_timer_get_ticks();
     uint32_t seconds = ticks / 1000;
     uint32_t ms = ticks % 1000;
+
+    if (ticks == last_ticks) {
+        return;
+    }
+    last_ticks = ticks;
     
     /* Clear status line */
     ck_vga_clear_line(0);
@@ -241,7 +267,7 @@ static void ck_shell_execute(const char *cmd) {
         ck_vga_write_string("  ps      - process list (the kitchen crew)\n", COLOR_WHITE);
         ck_vga_write_string("  memory  - see the cream filling (memory stats)\n", COLOR_WHITE);
         ck_vga_write_string("  tasks   - detailed task counters\n", COLOR_WHITE);
-        ck_vga_write_string("  taskmon - live scheduler monitor (watch tasks run!)\n", COLOR_WHITE);
+        ck_vga_write_string("  taskmon - live scheduler + mini game (A/D move, Q quit)\n", COLOR_WHITE);
         ck_vga_write_string("  history - show command history\n", COLOR_WHITE);
         ck_vga_write_string("  clear   - clean slate? Un-beet-able!\n", COLOR_WHITE);
         ck_vga_write_string("  reboot  - let's make a fresh bake\n", COLOR_WHITE);
@@ -371,7 +397,19 @@ static void ck_shell_execute(const char *cmd) {
     } else if (ck_strcmp(cmd_name, "taskmon") == 0) {
         ck_vga_write_string("Entering live task monitor... (press 'q' to exit)\n", COLOR_YELLOW);
         ck_visualizer_run_monitor();
+        ck_vga_clear_screen();
         ck_shell_draw_status();
+        ck_cursor_pos = 2 * VGA_WIDTH;
+        ck_vga_update_hw_cursor();
+        ck_vga_write_string("\n", COLOR_GREEN);
+        ck_vga_write_string("  +====================================+\n", COLOR_GREEN);
+        ck_vga_write_string("  | CheesecakeOS - Multitasking v1.0 |\n", COLOR_GREEN);
+        ck_vga_write_string("  |    Ready to serve! (May 2026)    |\n", COLOR_GREEN);
+        ck_vga_write_string("  +====================================+\n", COLOR_GREEN);
+        ck_vga_write_string("\n", COLOR_WHITE);
+        ck_vga_write_string("Type 'help' for commands | Try 'taskmon' for live demo\n", COLOR_YELLOW);
+        ck_vga_write_string("\n", COLOR_WHITE);
+        ck_vga_write_string("> ", COLOR_YELLOW);
     } else if (ck_strcmp(cmd_name, "clear") == 0) {
         ck_vga_clear_screen();
         ck_cursor_pos = VGA_WIDTH;  /* Leave status line alone */
@@ -399,6 +437,7 @@ void ck_shell_run(void) {
     
     /* Start at line 2 (line 0 is status, line 1 is blank) */
     ck_cursor_pos = 2 * VGA_WIDTH;
+    ck_vga_update_hw_cursor();
     
     ck_vga_write_string("\n", COLOR_GREEN);
     ck_vga_write_string("  +====================================+\n", COLOR_GREEN);
@@ -437,6 +476,7 @@ void ck_shell_run(void) {
                 input_len--;
                 ck_cursor_pos--;
                 VGA_BUFFER[ck_cursor_pos] = (COLOR_WHITE << 8) | 0x20;
+                ck_vga_update_hw_cursor();
             }
         } else if (c >= 32 && c < 127) {
             /* Printable character */

@@ -8,6 +8,44 @@ This project was built by a competitive programmer learning systems programming 
 
 ---
 
+## Showcase
+
+**Hero demo:** Live multitasking + task monitor + mini game
+
+Try this in QEMU:
+```text
+help
+info
+taskmon   (A/D move paddle, Q to exit)
+ps
+memory
+```
+
+What it shows:
+- Cooperative multitasking with per-task CPU activity bars
+- A mini game running inside the task monitor to make scheduling visible
+- Shell commands that expose memory, tasks, and system info
+
+Demo script (2-3 minutes):
+```text
+Boot QEMU
+help
+info
+taskmon   (A/D move paddle, Q to exit)
+ps
+memory
+```
+
+## Screenshots
+
+Suggested captures (and filenames):
+- `01_boot_banner.png` - Boot banner + status line
+- `02_help.png` - `help` output with full command list
+- `03_info.png` - `info` system overview
+- `04_taskmon.png` - Task monitor with mini game + CPU bars
+- `05_ps.png` - `ps` task list
+- `06_memory.png` - `memory` stats
+
 ## Features
 
 - ✅ Bootable kernel via GRUB (Multiboot2)
@@ -19,8 +57,9 @@ This project was built by a competitive programmer learning systems programming 
 - ✅ Physical memory allocator (bitmap-based 4KB pages)
 - ✅ x86 paging with identity-mapping
 - ✅ Heap allocator (malloc/free with freelist)
-- ✅ Interactive command-line shell with 5 commands
-- ⏳ Multitasking and process scheduling (planned)
+- ✅ Cooperative multitasking + scheduler stats
+- ✅ Task monitor with CPU bars + mini game demo
+- ✅ Interactive command-line shell with 11 commands
 
 ---
 
@@ -40,14 +79,10 @@ This project was built by a competitive programmer learning systems programming 
 
 ```
 ┌─────────────────────────────────────────┐
-│              User Space (Ring 3)        │
-│         Shell  │  Standard Library      │
-├─────────────────────────────────────────┤
-│           Syscall Interface             │  ← int 0x80
-├─────────────────────────────────────────┤
 │              Kernel Space (Ring 0)      │
+│  Shell + Taskmon + Mini Game            │
 │  Memory Mgmt │ Interrupts │ Scheduler   │
-│  VGA Driver  │  Keyboard  │  Serial     │
+│  VGA Driver  │  Keyboard  │  Timer      │
 ├─────────────────────────────────────────┤
 │           Hardware (x86, RAM)           │
 └─────────────────────────────────────────┘
@@ -66,7 +101,11 @@ cheesecakeOS/
 ├── src/
 │   ├── kernel/
 │   │   ├── ck_kernel.c       # Kernel main (initialization orchestration)
-│   │   └── shell.c           # Interactive shell with 5 commands
+│   │   ├── shell.c           # Interactive shell with 11 commands
+│   │   ├── kernel_tasks.c    # Demo tasks + mini game state
+│   │   ├── kernel_tasks.h    # Demo task API
+│   │   ├── visualizer.c      # Task monitor + mini game display
+│   │   └── visualizer.h      # Task monitor API
 │   ├── drivers/
 │   │   ├── timer.c           # PIT driver (1 kHz timer ticks)
 │   │   ├── keyboard.c        # PS/2 keyboard + shift/repeat support
@@ -102,6 +141,7 @@ cheesecakeOS/
 - Project Overview → [`docs/overview.md`](./docs/overview.md)
 - System Requirements → [`docs/srs.md`](./docs/srs.md)
 - Architecture → [`docs/architecture.md`](./docs/architecture.md)
+- Architecture Diagrams → [`docs/architecture-diagrams.md`](./docs/architecture-diagrams.md)
 - Dev Log → [`docs/devlog.md`](./docs/devlog.md)
 
 ---
@@ -142,7 +182,7 @@ make run
 |-----------|--------|-------------|
 | Bootloader (GRUB) | ✅ Complete | GRUB config, Multiboot2 header, auto-boot (5s timeout) |
 | Kernel entry | ✅ Complete | Boot assembly, `ck_kernel.c`, linker script |
-| Build pipeline | ✅ Complete | Makefile: NASM → GCC → LD → ISO (14 sources) |
+| Build pipeline | ✅ Complete | Makefile: NASM → GCC → LD → ISO (17 sources) |
 | VGA text driver | ✅ Complete | Clear screen, write strings, colors (80×25) |
 | Kernel boots in QEMU | ✅ Complete | Boots cleanly, no crashes |
 | CPU exception handling | ✅ Complete | All 32 exceptions caught and logged |
@@ -152,11 +192,12 @@ make run
 | Scancode-to-ASCII | ✅ Complete | Full US layout, shift support |
 | Shift key support | ✅ Complete | Uppercase + symbols (!@#$%^&*) |
 | Key repeat | ✅ Complete | 500ms initial delay, 50ms repeat interval |
-| Interactive shell | ✅ Complete | 5 commands: help, time, memory, clear, reboot |
+| Interactive shell | ✅ Complete | 11 commands (help, info, ps, taskmon, etc.) |
 | Physical memory allocator | ✅ Complete | Bitmap allocator (256MB, 4KB pages) |
 | x86 paging | ✅ Complete | Page directory/tables, identity-mapped kernel |
 | Heap allocator | ✅ Complete | malloc/free with freelist + page expansion |
-| Multitasking | ⏳ Planned | Task scheduling, context switching |
+| Multitasking | ✅ Complete | Cooperative scheduling + task stats |
+| Task monitor | ✅ Complete | CPU bars + mini game demo |
 
 ---
 
