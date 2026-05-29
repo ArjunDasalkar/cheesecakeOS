@@ -32,6 +32,67 @@ static int ck_strcmp(const char *a, const char *b) {
     return *a - *b;
 }
 
+/* Extract first word from string (command name) */
+static void ck_get_first_word(const char *s, char *word, int max_len) {
+    int i = 0;
+    while (i < max_len - 1 && s[i] && s[i] != ' ') {
+        word[i] = s[i];
+        i++;
+    }
+    word[i] = '\0';
+}
+
+/* Extract arguments (everything after first word) */
+static void ck_get_args(const char *s, char *args, int max_len) {
+    int i = 0;
+    /* Skip first word */
+    while (s[i] && s[i] != ' ') i++;
+    /* Skip spaces */
+    while (s[i] && s[i] == ' ') i++;
+    /* Copy rest */
+    int j = 0;
+    while (j < max_len - 1 && s[i]) {
+        args[j] = s[i];
+        i++;
+        j++;
+    }
+    args[j] = '\0';
+}
+
+/*
+ * Command history (stores last 10 commands)
+ */
+#define CK_HISTORY_SIZE 10
+#define CK_HISTORY_LINE_SIZE 64
+
+static char ck_history[CK_HISTORY_SIZE][CK_HISTORY_LINE_SIZE];
+static int ck_history_count = 0;
+
+static void ck_history_add(const char *cmd) {
+    if (ck_history_count < CK_HISTORY_SIZE) {
+        int i = 0;
+        while (i < CK_HISTORY_LINE_SIZE - 1 && cmd[i]) {
+            ck_history[ck_history_count][i] = cmd[i];
+            i++;
+        }
+        ck_history[ck_history_count][i] = '\0';
+        ck_history_count++;
+    } else {
+        /* Shift history up and add new one */
+        for (int i = 0; i < CK_HISTORY_SIZE - 1; i++) {
+            for (int j = 0; j < CK_HISTORY_LINE_SIZE; j++) {
+                ck_history[i][j] = ck_history[i + 1][j];
+            }
+        }
+        int i = 0;
+        while (i < CK_HISTORY_LINE_SIZE - 1 && cmd[i]) {
+            ck_history[CK_HISTORY_SIZE - 1][i] = cmd[i];
+            i++;
+        }
+        ck_history[CK_HISTORY_SIZE - 1][i] = '\0';
+    }
+}
+
 /*
  * VGA screen buffer management.
  */
@@ -160,23 +221,107 @@ static void ck_shell_draw_status(void) {
  * Execute a shell command.
  */
 static void ck_shell_execute(const char *cmd) {
-    if (ck_strcmp(cmd, "help") == 0) {
+    /* Track in history */
+    if (ck_strlen(cmd) > 0) {
+        ck_history_add(cmd);
+    }
+    
+    char cmd_name[64];
+    char cmd_args[128];
+    ck_get_first_word(cmd, cmd_name, sizeof(cmd_name));
+    ck_get_args(cmd, cmd_args, sizeof(cmd_args));
+    
+    if (ck_strcmp(cmd_name, "help") == 0) {
         ck_vga_write_string("That's grated of you to ask! Here are my flavors:\n", COLOR_GREEN);
         ck_vga_write_string("  help    - the crust of the matter\n", COLOR_WHITE);
+        ck_vga_write_string("  uptime  - how long kernel has been baking\n", COLOR_WHITE);
         ck_vga_write_string("  time    - this kernel is on a ROLL (no time to waste)\n", COLOR_WHITE);
-        ck_vga_write_string("  clear   - clean slate? Un-beet-able!\n", COLOR_WHITE);
+        ck_vga_write_string("  echo    - repeat what I tell you\n", COLOR_WHITE);
+        ck_vga_write_string("  info    - kernel details (what's in the mix)\n", COLOR_WHITE);
+        ck_vga_write_string("  ps      - process list (the kitchen crew)\n", COLOR_WHITE);
         ck_vga_write_string("  memory  - see the cream filling (memory stats)\n", COLOR_WHITE);
-        ck_vga_write_string("  tasks   - check the kitchen crew (multitasking demo)\n", COLOR_WHITE);
+        ck_vga_write_string("  tasks   - detailed task counters\n", COLOR_WHITE);
         ck_vga_write_string("  taskmon - live scheduler monitor (watch tasks run!)\n", COLOR_WHITE);
+        ck_vga_write_string("  history - show command history\n", COLOR_WHITE);
+        ck_vga_write_string("  clear   - clean slate? Un-beet-able!\n", COLOR_WHITE);
         ck_vga_write_string("  reboot  - let's make a fresh bake\n", COLOR_WHITE);
-    } else if (ck_strcmp(cmd, "time") == 0) {
+    } else if (ck_strcmp(cmd_name, "uptime") == 0) {
+        uint32_t ticks = ck_timer_get_ticks();
+        uint32_t seconds = ticks / 1000;
+        uint32_t millis = ticks % 1000;
+        ck_vga_write_string("System uptime: ", COLOR_GREEN);
+        ck_vga_write_number(seconds, COLOR_WHITE);
+        ck_vga_write_string(".", COLOR_WHITE);
+        ck_vga_write_number(millis / 100, COLOR_WHITE);
+        ck_vga_write_string(" seconds (baked to perfection!)\n", COLOR_GREEN);
+    } else if (ck_strcmp(cmd_name, "echo") == 0) {
+        if (ck_strlen(cmd_args) > 0) {
+            ck_vga_write_string(cmd_args, COLOR_YELLOW);
+            ck_vga_write_string("\n", COLOR_YELLOW);
+        } else {
+            ck_vga_write_string("(echo what?)\n", COLOR_YELLOW);
+        }
+    } else if (ck_strcmp(cmd_name, "info") == 0) {
+        ck_vga_write_string("CheesecakeOS v1.0 - Multitasking x86 Kernel\n", COLOR_GREEN);
+        ck_vga_write_string("Architecture: 32-bit x86 (i686) Protected Mode\n", COLOR_WHITE);
+        ck_vga_write_string("Bootloader: GRUB Multiboot2\n", COLOR_WHITE);
+        
+        uint32_t total_mem = ck_pmem_get_total_memory();
+        uint32_t used_pages = ck_pmem_get_used_pages();
+        ck_vga_write_string("Memory: ", COLOR_WHITE);
+        ck_vga_write_number(total_mem / 1048576, COLOR_WHITE);
+        ck_vga_write_string(" MB | ", COLOR_WHITE);
+        ck_vga_write_number(used_pages, COLOR_WHITE);
+        ck_vga_write_string(" pages used\n", COLOR_WHITE);
+        
+        uint32_t heap_used = ck_heap_get_total_allocated() - ck_heap_get_total_freed();
+        ck_vga_write_string("Heap: ", COLOR_WHITE);
+        ck_vga_write_number(heap_used / 1024, COLOR_WHITE);
+        ck_vga_write_string(" KB allocated\n", COLOR_WHITE);
+        
+        ck_vga_write_string("Interrupts: 32 exceptions + 16 IRQs (PIC remapped)\n", COLOR_WHITE);
+        ck_vga_write_string("Timer: 1 kHz PIT (Intel 8254)\n", COLOR_WHITE);
+        ck_vga_write_string("Input: PS/2 keyboard\n", COLOR_WHITE);
+        
+        uint32_t num_tasks = ck_scheduler_task_count();
+        ck_vga_write_string("Tasks: ", COLOR_WHITE);
+        ck_vga_write_number(num_tasks, COLOR_WHITE);
+        ck_vga_write_string(" running | ", COLOR_WHITE);
+        ck_vga_write_number(ck_scheduler_get_context_switches(), COLOR_WHITE);
+        ck_vga_write_string(" context switches\n", COLOR_WHITE);
+    } else if (ck_strcmp(cmd_name, "ps") == 0) {
+        ck_vga_write_string("PID  STATE    COUNTER\n", COLOR_GREEN);
+        ck_vga_write_string("---  --------  -----------\n", COLOR_WHITE);
+        
+        uint32_t num_tasks = ck_scheduler_task_count();
+        for (uint32_t i = 0; i < num_tasks; i++) {
+            struct ck_task *task = ck_scheduler_get_task(i);
+            if (task) {
+                ck_vga_write_number(i, COLOR_YELLOW);
+                ck_vga_write_string("    READY     ", COLOR_WHITE);
+                ck_vga_write_number(ck_task_counter[i], COLOR_YELLOW);
+                ck_vga_write_string("\n", COLOR_WHITE);
+            }
+        }
+    } else if (ck_strcmp(cmd_name, "history") == 0) {
+        ck_vga_write_string("Command History:\n", COLOR_GREEN);
+        for (int i = 0; i < ck_history_count; i++) {
+            ck_vga_write_number(i + 1, COLOR_YELLOW);
+            ck_vga_write_string(": ", COLOR_WHITE);
+            ck_vga_write_string(ck_history[i], COLOR_WHITE);
+            ck_vga_write_string("\n", COLOR_WHITE);
+        }
+        if (ck_history_count == 0) {
+            ck_vga_write_string("(no commands yet)\n", COLOR_YELLOW);
+        }
+    } else if (ck_strcmp(cmd_name, "time") == 0) {
         uint32_t ticks = ck_timer_get_ticks();
         ck_vga_write_string("Baking time: ", COLOR_GREEN);
         ck_vga_write_number(ticks / 1000, COLOR_WHITE);
         ck_vga_write_string(".", COLOR_WHITE);
         ck_vga_write_number(ticks % 1000, COLOR_WHITE);
         ck_vga_write_string(" seconds (looking gouda!)\n", COLOR_WHITE);
-    } else if (ck_strcmp(cmd, "memory") == 0) {
+    } else if (ck_strcmp(cmd_name, "memory") == 0) {
         ck_vga_write_string("Memory Status - A Creamy Filling:\n", COLOR_GREEN);
         
         uint32_t total_mem = ck_pmem_get_total_memory();
@@ -203,7 +348,7 @@ static void ck_shell_execute(const char *cmd) {
         ck_vga_write_string(" bytes | Freed: ", COLOR_WHITE);
         ck_vga_write_number(heap_freed, COLOR_WHITE);
         ck_vga_write_string(" bytes\n", COLOR_WHITE);
-    } else if (ck_strcmp(cmd, "tasks") == 0) {
+    } else if (ck_strcmp(cmd_name, "tasks") == 0) {
         ck_vga_write_string("Running Kernel Tasks - The Kitchen Crew:\n", COLOR_GREEN);
         
         uint32_t num_tasks = ck_scheduler_task_count();
@@ -223,22 +368,22 @@ static void ck_shell_execute(const char *cmd) {
                 ck_vga_write_string(")\n", COLOR_WHITE);
             }
         }
-    } else if (ck_strcmp(cmd, "taskmon") == 0) {
+    } else if (ck_strcmp(cmd_name, "taskmon") == 0) {
         ck_vga_write_string("Entering live task monitor... (press 'q' to exit)\n", COLOR_YELLOW);
         ck_visualizer_run_monitor();
         ck_shell_draw_status();
-    } else if (ck_strcmp(cmd, "clear") == 0) {
+    } else if (ck_strcmp(cmd_name, "clear") == 0) {
         ck_vga_clear_screen();
         ck_cursor_pos = VGA_WIDTH;  /* Leave status line alone */
         ck_vga_write_string("Fresh and crumbly, just like a new kernel!\n", COLOR_GREEN);
-    } else if (ck_strcmp(cmd, "reboot") == 0) {
+    } else if (ck_strcmp(cmd_name, "reboot") == 0) {
         ck_vga_write_string("Time to serve this kernel... it's reached peak temp!\n", COLOR_RED);
         __asm__("cli");
         __asm__("hlt");
-    } else if (ck_strlen(cmd) == 0) {
+    } else if (ck_strlen(cmd_name) == 0) {
         /* Empty command, do nothing */
     } else {
-        ck_vga_write_string("That command is crumbly... try 'help' for a fresh list.\n", COLOR_RED);
+        ck_vga_write_string("🍪 That command is crumbly... try 'help' for the menu.\n", COLOR_RED);
     }
 }
 
@@ -255,8 +400,14 @@ void ck_shell_run(void) {
     /* Start at line 2 (line 0 is status, line 1 is blank) */
     ck_cursor_pos = 2 * VGA_WIDTH;
     
-    ck_vga_write_string("Welcome to CheesecakeOS!\n", COLOR_GREEN);
-    ck_vga_write_string("Type 'help' to see what's baking.\n\n", COLOR_YELLOW);
+    ck_vga_write_string("\n", COLOR_GREEN);
+    ck_vga_write_string("  ╔════════════════════════════════════════════╗\n", COLOR_GREEN);
+    ck_vga_write_string("  ║  CheesecakeOS - Multitasking Kernel v1.0   ║\n", COLOR_GREEN);
+    ck_vga_write_string("  ║     Ready to serve! (May 2026)             ║\n", COLOR_GREEN);
+    ck_vga_write_string("  ╚════════════════════════════════════════════╝\n", COLOR_GREEN);
+    ck_vga_write_string("\n", COLOR_WHITE);
+    ck_vga_write_string("Type 'help' for commands | Try 'taskmon' for live demo\n", COLOR_YELLOW);
+    ck_vga_write_string("\n", COLOR_WHITE);
     ck_vga_write_string("> ", COLOR_YELLOW);
     
     while (1) {
