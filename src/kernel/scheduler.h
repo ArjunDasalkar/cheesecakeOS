@@ -75,6 +75,12 @@ uint32_t ck_scheduler_task_count(void);
 struct ck_task *ck_scheduler_get_task(uint32_t id);
 
 /*
+ * Get the total number of context switches.
+ * Useful for monitoring scheduler activity.
+ */
+uint32_t ck_scheduler_get_context_switches(void);
+
+/*
  * Run all kernel tasks cooperatively.
  * This function continuously cycles through tasks, giving each a chance to run.
  * Called from the shell's main loop.

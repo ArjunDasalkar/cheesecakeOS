@@ -5,6 +5,7 @@
 #include "../memory/heap.h"
 #include "scheduler.h"
 #include "kernel_tasks.h"
+#include "visualizer.h"
 
 /* VGA text buffer */
 #define VGA_BUFFER ((unsigned short *)0xB8000)
@@ -166,6 +167,7 @@ static void ck_shell_execute(const char *cmd) {
         ck_vga_write_string("  clear   - clean slate? Un-beet-able!\n", COLOR_WHITE);
         ck_vga_write_string("  memory  - see the cream filling (memory stats)\n", COLOR_WHITE);
         ck_vga_write_string("  tasks   - check the kitchen crew (multitasking demo)\n", COLOR_WHITE);
+        ck_vga_write_string("  taskmon - live scheduler monitor (watch tasks run!)\n", COLOR_WHITE);
         ck_vga_write_string("  reboot  - let's make a fresh bake\n", COLOR_WHITE);
     } else if (ck_strcmp(cmd, "time") == 0) {
         uint32_t ticks = ck_timer_get_ticks();
@@ -221,6 +223,10 @@ static void ck_shell_execute(const char *cmd) {
                 ck_vga_write_string(")\n", COLOR_WHITE);
             }
         }
+    } else if (ck_strcmp(cmd, "taskmon") == 0) {
+        ck_vga_write_string("Entering live task monitor... (press 'q' to exit)\n", COLOR_YELLOW);
+        ck_visualizer_run_monitor();
+        ck_shell_draw_status();
     } else if (ck_strcmp(cmd, "clear") == 0) {
         ck_vga_clear_screen();
         ck_cursor_pos = VGA_WIDTH;  /* Leave status line alone */

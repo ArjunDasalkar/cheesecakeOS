@@ -26,6 +26,7 @@
 static struct ck_task ck_task_table[CK_SCHEDULER_MAX_TASKS];
 static uint32_t ck_task_count = 0;
 static uint32_t ck_current_task_id = 0;
+static uint32_t ck_context_switches = 0;
 
 /*
  * Saved execution context for cooperative multitasking.
@@ -45,6 +46,7 @@ void ck_scheduler_init(void) {
     memset(ck_task_table, 0, sizeof(ck_task_table));
     ck_task_count = 0;
     ck_current_task_id = 0;
+    ck_context_switches = 0;
     ck_current_context.task = NULL;
     ck_current_context.call_depth = 0;
 }
@@ -139,6 +141,7 @@ void ck_scheduler_run_tasks(void) {
         if (task->state == CK_TASK_READY || task->state == CK_TASK_RUNNING) {
             task->state = CK_TASK_RUNNING;
             task->times_run++;
+            ck_context_switches++;
             
             ck_current_context.task = task;
             ck_current_context.call_depth = 0;
@@ -151,6 +154,14 @@ void ck_scheduler_run_tasks(void) {
             task->state = CK_TASK_READY;
         }
     }
+}
+
+/*
+ * Get the total number of context switches.
+ * Useful for monitoring scheduler activity.
+ */
+uint32_t ck_scheduler_get_context_switches(void) {
+    return ck_context_switches;
 }
 
 /*
