@@ -1111,3 +1111,220 @@ cheesecake> [returns to shell]
 
 ### Summary
 Phase 4a transforms CheesecakeOS from an invisible, statistical multitasking kernel into a visually demonstrable one. The `taskmon` command provides a 30-second demonstration that proves the entire stack is working: timer interrupts drive task yielding, the scheduler fairly cycles between tasks, memory allocators keep stack separate, and the system remains responsive. This directly addresses the portfolio problem: "show, don't tell" the kernel works.
+
+---
+
+## Phase 4b: Shell Polish and System Commands (May 29, 2026)
+
+### Overview
+Enhanced the shell with professional commands and improved UX. Added 5 new commands (`uptime`, `echo`, `ps`, `info`, `history`), implemented command history tracking, improved boot banner, and better error messages. The shell now feels like a complete system rather than a minimal demo.
+
+### Purpose
+Phase 4a made the kernel visually impressive. Phase 4b makes it feel complete and professional:
+- **System visibility**: Users can query CPU, memory, tasks, uptime
+- **User experience**: Boot banner, help text, history
+- **Professional feel**: Multiple well-designed commands
+- **Portfolio value**: Demonstrates systems programming skill beyond just multitasking
+
+### New Commands
+
+**1. `uptime`**
+```
+cheesecake> uptime
+System uptime: 47.3 seconds (baked to perfection!)
+```
+- Shows seconds since boot from timer tick counter
+- Quick way to see kernel has been running
+
+**2. `echo [text]`**
+```
+cheesecake> echo Hello CheesecakeOS
+Hello CheesecakeOS
+```
+- Repeats back whatever the user types
+- Supports arguments after command name
+- Demonstrates command parsing
+
+**3. `ps`** (process list)
+```
+cheesecake> ps
+PID  STATE    COUNTER
+---  --------  -----------
+0    READY     45,892
+1    READY     32,450
+2    READY     51,234
+3    READY     28,321
+```
+- Formatted task list (like Unix `ps` command)
+- Shows process ID, state, and activity counter
+- More professional than raw `tasks` command
+
+**4. `info`** (system information)
+```
+cheesecake> info
+CheesecakeOS v1.0 - Multitasking x86 Kernel
+Architecture: 32-bit x86 (i686) Protected Mode
+Bootloader: GRUB Multiboot2
+Memory: 256 MB | 12 pages used
+Heap: 64 KB allocated
+Interrupts: 32 exceptions + 16 IRQs (PIC remapped)
+Timer: 1 kHz PIT (Intel 8254)
+Input: PS/2 keyboard
+Tasks: 4 running | 428,191 context switches
+```
+- Comprehensive system overview
+- Shows architecture, bootloader, memory, interrupts, drivers
+- Demonstrates deep system knowledge
+
+**5. `history`** (command history)
+```
+cheesecake> history
+Command History:
+1: help
+2: taskmon
+3: info
+4: uptime
+5: ps
+```
+- Shows last 10 commands executed
+- Useful for debugging and learning
+- Standard shell feature
+
+### Implementation Details
+
+**String Parsing Infrastructure**
+- `ck_get_first_word()` — Extract command name from input
+- `ck_get_args()` — Extract arguments after first word
+- Enables commands like `echo` to receive arguments
+
+**Command History Tracking**
+- Static buffer: `char ck_history[10][64]` (10 commands, 64 chars each)
+- `ck_history_count` tracks current history size
+- `ck_history_add()` adds new command, shifts old ones if buffer full
+- History persists for current session
+
+**Updated `ck_shell_execute()` Function**
+- Now takes command name + arguments separately
+- Commands compared against name only (not full input)
+- Old commands still work (backward compatible)
+- ~200 lines of new command handlers
+
+**Modified Boot Message**
+```
+╔════════════════════════════════════════════╗
+║  CheesecakeOS - Multitasking Kernel v1.0   ║
+║     Ready to serve! (May 2026)             ║
+╚════════════════════════════════════════════╝
+
+Type 'help' for commands | Try 'taskmon' for live demo
+```
+- ASCII art box with system name and version
+- Welcoming message pointing to key features
+- Professional first impression
+
+**Help System**
+- Updated help text to list all 11 commands:
+  - help, uptime, time, echo, info, ps, memory, tasks, taskmon, history, clear, reboot
+- Better descriptions emphasizing what each does
+- Encourages user to try features
+
+**Error Messages**
+- More personality: "🍪 That command is crumbly... try 'help' for the menu."
+- Consistent with cheesecake theme
+- Friendly and informative
+
+### User Experience Flow
+
+**Typical Session:**
+```
+[Boot banner displays]
+Type 'help' for commands | Try 'taskmon' for live demo
+
+> help
+[shows all 11 commands]
+
+> info
+CheesecakeOS v1.0 - Multitasking x86 Kernel
+[system details]
+
+> uptime
+System uptime: 12.3 seconds
+
+> ps
+[process list]
+
+> taskmon
+[enters live monitor, watches 4 tasks]
+
+> history
+[shows all commands user typed]
+```
+
+### Design Decisions
+
+**Why These 5 Commands?**
+- `uptime` — Essential system command, shows kernel is running
+- `echo` — Demonstrates command parsing and argument handling
+- `ps` — Standard Unix interface users expect
+- `info` — Showcases deep system knowledge
+- `history` — Useful for learning and debugging
+
+**Why Not More?**
+- Diminishing returns: 11 commands is comprehensive for a student project
+- Quality over quantity: Each command is well-implemented
+- Performance: No significant overhead
+- Scope: Enough to demonstrate professionalism
+
+**Why Command History?**
+- Shows software engineering discipline
+- Useful for portfolio interviewer: "Can you try this again?"
+- Standard shell feature users expect
+- Small implementation (10-command buffer)
+
+**Why ASCII Art Boot Banner?**
+- First impression matters for portfolio
+- Shows attention to detail
+- Memorable and professional
+- Takes 4 lines of code, huge visual impact
+
+### Build Impact
+- Added ~200 lines to shell.c
+- Added string parsing and history functions
+- No new files, no external dependencies
+- **Total:** ~3,300 LOC, ~172KB binary
+- **Build time:** Still <1 second
+- **No regressions** in prior systems
+
+### Portfolio Value
+
+**Before Phase 4b:**
+- "Here's my kernel with multitasking"
+- Interviewer runs it, sees basic shell
+
+**After Phase 4b:**
+- "Here's my kernel with multitasking"
+- Interviewer boots it, sees professional boot banner
+- Types `help`, sees 11 well-designed commands
+- Runs `taskmon`, sees live scheduler
+- Runs `info`, learns about all subsystems
+- Types `history`, sees the commands used
+- **Result:** Professional, complete system
+
+### Lessons Learned
+
+1. **UX matters**: Good error messages and help text make the system feel professional
+2. **Command design**: Matching Unix conventions (`ps`, `uptime`) helps users
+3. **Boot impression**: First thing user sees sets expectations
+4. **History is useful**: Implementing standard features shows systems knowledge
+5. **Scope is important**: 11 commands is the sweet spot (not overwhelming, not sparse)
+
+### Current Status
+- ✅ 11 shell commands fully functional
+- ✅ Command history tracking working
+- ✅ Boot banner displays properly
+- ✅ Help text comprehensive and accurate
+- ✅ All commands tested and working
+- ✅ No regressions in prior phases
+
+### Summary
+Phase 4b transforms the shell from a minimal demo into a professional system interface. The boot banner, helpful commands, and history tracking make CheesecakeOS feel like a real, complete operating system. This is critical for portfolio presentation: the difference between "here's a kernel" and "here's a professional operating system project."
