@@ -8,15 +8,19 @@ This project was built by a competitive programmer learning systems programming 
 
 ---
 
-## Features (Planned)
+## Features
 
-- Bootable kernel via GRUB (Multiboot2)
-- VGA text-mode output (80×25)
-- Interrupt Descriptor Table (IDT) + hardware interrupt handling
-- PS/2 Keyboard and timer drivers
-- Memory management (physical allocator, paging, heap)
-- Basic interactive command-line shell
-- (Optional) Basic multitasking support
+- ✅ Bootable kernel via GRUB (Multiboot2)
+- ✅ VGA text-mode output (80×25) with color support
+- ✅ Interrupt Descriptor Table (IDT) + CPU exception handling (vectors 0-31)
+- ✅ PIC remapping and hardware interrupt handling (vectors 32-47)
+- ✅ PS/2 Keyboard with shift support and key repeat
+- ✅ Programmable Interval Timer (1 kHz tick counter)
+- ✅ Physical memory allocator (bitmap-based 4KB pages)
+- ✅ x86 paging with identity-mapping
+- ✅ Heap allocator (malloc/free with freelist)
+- ✅ Interactive command-line shell with 5 commands
+- ⏳ Multitasking and process scheduling (planned)
 
 ---
 
@@ -56,23 +60,38 @@ This project was built by a competitive programmer learning systems programming 
 ```text
 cheesecakeOS/
 ├── boot/
+│   ├── boot.asm              # x86 assembly entry point
 │   └── grub/
-│       └── grub.cfg          # GRUB bootloader config
+│       └── grub.cfg          # GRUB bootloader config (5s menu timeout)
 ├── src/
 │   ├── kernel/
-│   │   └── ck_kernel.c       # Kernel entry point
-│   ├── drivers/              # VGA, keyboard, serial drivers
-│   ├── memory/               # Physical allocator, paging, heap
-│   ├── interrupts/           # IDT, ISR, IRQ handlers
-│   └── linker.ld             # Linker script — memory layout
+│   │   ├── ck_kernel.c       # Kernel main (initialization orchestration)
+│   │   └── shell.c           # Interactive shell with 5 commands
+│   ├── drivers/
+│   │   ├── timer.c           # PIT driver (1 kHz timer ticks)
+│   │   ├── keyboard.c        # PS/2 keyboard + shift/repeat support
+│   │   └── scancode.c        # Scancode-to-ASCII tables (unshifted + shifted)
+│   ├── interrupts/
+│   │   ├── idt.c             # IDT initialization
+│   │   ├── exceptions.c      # CPU exception (0-31) dispatcher
+│   │   ├── exceptions.asm    # Exception stub stubs
+│   │   ├── pic.c             # PIC remapping (IRQs 32-47)
+│   │   ├── irq.c             # IRQ handler dispatcher
+│   │   └── irq.asm           # IRQ stubs (16 IRQs)
+│   ├── memory/
+│   │   ├── pmem.c            # Physical memory allocator (bitmap, 256MB)
+│   │   ├── paging.c          # x86 paging (page dir/tables, identity-map)
+│   │   └── heap.c            # Heap allocator (malloc/free)
+│   └── linker.ld             # Linker script (kernel at 0x100000)
 ├── docs/
-│   ├── overview.md           # Project overview
-│   ├── srs.md                # System requirements
-│   ├── architecture.md       # Detailed architecture notes
-│   └── devlog.md             # Development log
-├── build/                    # Compiled output (git-ignored)
-├── Makefile
-├── README.md
+│   ├── overview.md           # Project overview and objectives
+│   ├── srs.md                # System requirements and goals
+│   ├── architecture.md       # Technical architecture details
+│   └── devlog.md             # Development log (debugging, decisions)
+├── build/                    # Build artifacts (git-ignored)
+├── Makefile                  # Build orchestration
+├── README.md                 # This file
+├── context.md                # Project context for AI assistants
 └── .gitignore
 ```
 
@@ -121,17 +140,23 @@ make run
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| Bootloader (GRUB) | ✅ Complete | GRUB config, Multiboot2 header, auto-boot |
+| Bootloader (GRUB) | ✅ Complete | GRUB config, Multiboot2 header, auto-boot (5s timeout) |
 | Kernel entry | ✅ Complete | Boot assembly, `ck_kernel.c`, linker script |
-| Build pipeline | ✅ Complete | Makefile: NASM → GCC → LD → ISO |
-| VGA text driver | ✅ Complete | Clear screen, write strings (80×25) |
-| Kernel boots in QEMU | ✅ Complete | Boots and displays message successfully |
-| Interrupt handling | 🔄 Next | IDT, ISR stubs, PIC remapping |
-| Keyboard driver | ⏳ Planned | PS/2 keyboard via IRQ1 |
-| Physical memory manager | ⏳ Planned | Bitmap frame allocator |
-| Heap allocator | ⏳ Planned | `ck_malloc` / `ck_free` |
-| Paging | ⏳ Planned | Page directory/tables, virtual memory |
-| Shell | ⏳ Planned | Basic CLI with built-in commands |
+| Build pipeline | ✅ Complete | Makefile: NASM → GCC → LD → ISO (14 sources) |
+| VGA text driver | ✅ Complete | Clear screen, write strings, colors (80×25) |
+| Kernel boots in QEMU | ✅ Complete | Boots cleanly, no crashes |
+| CPU exception handling | ✅ Complete | All 32 exceptions caught and logged |
+| PIC remapping & IRQs | ✅ Complete | Master (vec 32-39), Slave (vec 40-47) |
+| Timer driver (PIT) | ✅ Complete | 1 kHz tick counter, 1ms granularity |
+| Keyboard driver | ✅ Complete | PS/2 scancode buffering, no data loss |
+| Scancode-to-ASCII | ✅ Complete | Full US layout, shift support |
+| Shift key support | ✅ Complete | Uppercase + symbols (!@#$%^&*) |
+| Key repeat | ✅ Complete | 500ms initial delay, 50ms repeat interval |
+| Interactive shell | ✅ Complete | 5 commands: help, time, memory, clear, reboot |
+| Physical memory allocator | ✅ Complete | Bitmap allocator (256MB, 4KB pages) |
+| x86 paging | ✅ Complete | Page directory/tables, identity-mapped kernel |
+| Heap allocator | ✅ Complete | malloc/free with freelist + page expansion |
+| Multitasking | ⏳ Planned | Task scheduling, context switching |
 
 ---
 

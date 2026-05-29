@@ -1,5 +1,16 @@
 /* ck_kernel.c - basic VGA hello */
 
+#include "../interrupts/idt.h"
+#include "../interrupts/exceptions.h"
+#include "../interrupts/pic.h"
+#include "../interrupts/irq.h"
+#include "../drivers/timer.h"
+#include "../drivers/keyboard.h"
+#include "../memory/pmem.h"
+#include "../memory/paging.h"
+#include "../memory/heap.h"
+#include "shell.h"
+
 /* VGA text buffer + screen size */
 #define VGA_BUFFER ((unsigned short *)0xB8000)
 #define VGA_WIDTH 80
@@ -28,11 +39,27 @@ void ck_vga_write_string(const char *str) {
 
 /* Entry from boot.asm */
 void ck_main(void) {
-    ck_vga_clear_screen();
-    ck_vga_write_string("CheesecakeOS served fresh...");
+    /* Ensure interrupts are disabled during early init. */
+    __asm__("cli");
 
-    /* Stay here */
-    while (1) {
-        __asm__("hlt");
-    }
+    ck_vga_clear_screen();
+    ck_vga_write_string("Initializing CheesecakeOS...");
+
+    ck_idt_init();
+    ck_exceptions_init();
+    ck_pic_init();
+    ck_irq_init();
+    ck_timer_init();
+    ck_keyboard_init();
+    
+    /* Initialize memory management */
+    ck_pmem_init(NULL);   /* TODO: Pass GRUB multiboot info */
+    ck_paging_init();
+    ck_heap_init();
+
+    /* Enable interrupts */
+    __asm__("sti");
+
+    /* Start the shell */
+    ck_shell_run();
 }

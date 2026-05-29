@@ -44,6 +44,7 @@ section .text
 global ck_start
 
 ck_start:
+    cli                         ; Keep interrupts off during early init
     mov esp, ck_stack_top       ; Point stack pointer to top of stack
     and esp, 0xFFFFFFF0         ; Align stack to 16 bytes (C calling convention)
 
